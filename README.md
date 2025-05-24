@@ -1,4 +1,4 @@
-# Outlook 自动创建与管理脚本使用说明
+# Outlook 自动创建与管理脚本使用说明 - 优化版
 
 ## 功能介绍
 
@@ -11,10 +11,37 @@
 5. 将邮箱、密码和TOTP信息保存到文件中，支持查看和导出
 6. 添加自动修改outlook密码的功能，支持批量处理已有账号
 
-## 安装依赖
+## 安装依赖 (Ubuntu 22.04+)
+
+使用提供的安装脚本：
 
 ```bash
-pip install -r requirements.txt
+# 给安装脚本添加执行权限
+chmod +x install.sh
+
+# 运行安装脚本
+./install.sh
+```
+
+或手动安装：
+
+```bash
+# 更新软件包
+sudo apt update
+
+# 安装Python和pip
+sudo apt install -y python3 python3-pip
+
+# 安装Chrome浏览器
+sudo apt install -y wget
+wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+sudo apt install -y ./google-chrome-stable_current_amd64.deb
+
+# 安装Xvfb (用于无头环境)
+sudo apt install -y xvfb
+
+# 安装Python依赖
+pip3 install -r requirements.txt
 ```
 
 ## 使用方法
@@ -23,48 +50,48 @@ pip install -r requirements.txt
 
 ```bash
 # 创建1个账号（默认使用无头模式，适合VPS无图形界面环境）
-python outlook_creator.py create
+python3 outlook_creator.py create
 
 # 创建多个账号
-python outlook_creator.py create -c 5
+python3 outlook_creator.py create -c 5
 
 # 使用多线程
-python outlook_creator.py create -c 5 -t 3
+python3 outlook_creator.py create -c 5 -t 3
 
 # 使用SOCKS5代理
-python outlook_creator.py create -p 127.0.0.1:1080
+python3 outlook_creator.py create -p 127.0.0.1:1080
 
 # 使用代理文件（每行一个代理）
-python outlook_creator.py create -P proxies.txt
+python3 outlook_creator.py create -P proxies.txt
 
 # 如果需要在有图形界面的环境下运行（不推荐）
-python outlook_creator.py create --no-headless
+python3 outlook_creator.py create --no-headless
 ```
 
 ### 修改账号密码
 
 ```bash
 # 修改所有账号密码
-python outlook_creator.py change
+python3 outlook_creator.py change
 
 # 修改指定邮箱密码
-python outlook_creator.py change -e example@outlook.com
+python3 outlook_creator.py change -e example@outlook.com
 
 # 使用多线程
-python outlook_creator.py change -t 3
+python3 outlook_creator.py change -t 3
 
 # 使用SOCKS5代理
-python outlook_creator.py change -p 127.0.0.1:1080
+python3 outlook_creator.py change -p 127.0.0.1:1080
 ```
 
 ### 导出账号信息
 
 ```bash
 # 导出为文本格式（邮箱—-密码—-TOTP格式，默认）
-python outlook_creator.py export -o accounts_export.txt
+python3 outlook_creator.py export -o accounts_export.txt
 
 # 导出为CSV格式
-python outlook_creator.py export -o accounts_export.csv --format csv
+python3 outlook_creator.py export -o accounts_export.csv --format csv
 ```
 
 ## 输出文件
@@ -77,29 +104,14 @@ python outlook_creator.py export -o accounts_export.csv --format csv
 ## 在无图形界面VPS上使用
 
 1. 脚本默认使用无头模式，适合在无图形界面的VPS上运行
-2. 确保安装了Chrome浏览器和必要的依赖：
+2. 在无头环境中运行脚本：
 
 ```bash
-# 更新软件包
-sudo apt update
+# 直接运行（已优化为无头环境）
+python3 outlook_creator.py create
 
-# 安装Chrome浏览器
-sudo apt install -y wget
-wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
-sudo apt install -y ./google-chrome-stable_current_amd64.deb
-
-# 安装必要的依赖
-sudo apt install -y xvfb libxi6 libgconf-2-4
-```
-
-3. 使用Xvfb可以在无图形界面的服务器上运行浏览器：
-
-```bash
-# 安装Xvfb
-sudo apt install -y xvfb
-
-# 使用Xvfb运行脚本
-xvfb-run python outlook_creator.py create
+# 或使用Xvfb运行以确保兼容性
+xvfb-run python3 outlook_creator.py create
 ```
 
 ## 在VSCode终端中使用
@@ -110,7 +122,7 @@ xvfb-run python outlook_creator.py create
 
 ## 注意事项
 
-1. 脚本需要安装Chrome浏览器和对应版本的ChromeDriver
+1. 脚本需要安装Chrome浏览器
 2. 首次运行时会自动下载ChromeDriver
 3. 注册过程中可能需要处理验证码或其他验证步骤
 4. 使用代理时请确保代理可用
@@ -123,3 +135,13 @@ xvfb-run python outlook_creator.py create
 2. **验证码处理**：当前版本需要手动处理验证码，未来版本可能会添加自动处理功能
 3. **代理不可用**：请检查代理格式和可用性，确保代理支持SOCKS5协议
 4. **无法在VPS上运行**：确保已安装所有必要依赖，并使用Xvfb或确保脚本使用无头模式
+
+## 优化说明
+
+此版本针对Ubuntu 22.04及更高版本进行了优化：
+
+1. 移除了过时的依赖（如libgconf-2-4）
+2. 使用更新的Chrome无头模式参数
+3. 改进了依赖导入方式，提高兼容性
+4. 添加了更多错误处理和恢复机制
+5. 优化了输出格式，使用"邮箱—-密码—-TOTP Key"格式

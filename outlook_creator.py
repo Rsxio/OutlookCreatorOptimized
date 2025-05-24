@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
-Outlook 自动创建与管理脚本
+Outlook 自动创建与管理脚本 - 优化版
 功能：
 1. 自动创建outlook.com邮箱，随机生成邮箱名和密码
 2. 随机生成大于18岁的个人信息
@@ -27,24 +27,6 @@ import threading
 import queue
 from typing import List, Dict, Optional, Tuple, Any
 from concurrent.futures import ThreadPoolExecutor
-from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import (
-    TimeoutException, 
-    NoSuchElementException, 
-    ElementClickInterceptedException,
-    StaleElementReferenceException
-)
-from webdriver_manager.chrome import ChromeDriverManager
-from fake_useragent import UserAgent
-import pyotp
-import qrcode
-from PIL import Image
-from io import BytesIO
 
 # 配置日志
 logging.basicConfig(
@@ -83,26 +65,53 @@ class OutlookCreator:
         
     def setup_driver(self):
         """配置并初始化WebDriver"""
-        options = Options()
-        if self.headless:
-            options.add_argument("--headless")
-        
-        options.add_argument("--no-sandbox")
-        options.add_argument("--disable-dev-shm-usage")
-        options.add_argument("--disable-gpu")
-        options.add_argument("--window-size=1920,1080")
-        options.add_argument(f"user-agent={UserAgent().random}")
-        
-        # 配置代理
-        if self.proxy:
-            options.add_argument(f'--proxy-server=socks5://{self.proxy}')
-            logger.info(f"使用SOCKS5代理: {self.proxy}")
-        
         try:
-            service = Service(ChromeDriverManager().install())
-            self.driver = webdriver.Chrome(service=service, options=options)
-            self.driver.set_page_load_timeout(DEFAULT_TIMEOUT)
-            logger.info("WebDriver初始化成功")
+            # 延迟导入，避免在导入时就需要依赖
+            from selenium import webdriver
+            from selenium.webdriver.chrome.options import Options
+            from selenium.webdriver.chrome.service import Service
+            from webdriver_manager.chrome import ChromeDriverManager
+            from fake_useragent import UserAgent
+            
+            options = Options()
+            if self.headless:
+                options.add_argument("--headless=new")  # 使用新的headless模式
+            
+            options.add_argument("--no-sandbox")
+            options.add_argument("--disable-dev-shm-usage")
+            options.add_argument("--disable-gpu")
+            options.add_argument("--window-size=1920,1080")
+            
+            # 添加额外参数以解决无头模式下的一些问题
+            options.add_argument("--disable-features=VizDisplayCompositor")
+            options.add_argument("--disable-extensions")
+            options.add_argument("--disable-infobars")
+            
+            try:
+                options.add_argument(f"user-agent={UserAgent().random}")
+            except:
+                options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+            
+            # 配置代理
+            if self.proxy:
+                options.add_argument(f'--proxy-server=socks5://{self.proxy}')
+                logger.info(f"使用SOCKS5代理: {self.proxy}")
+            
+            try:
+                service = Service(ChromeDriverManager().install())
+                self.driver = webdriver.Chrome(service=service, options=options)
+                self.driver.set_page_load_timeout(DEFAULT_TIMEOUT)
+                logger.info("WebDriver初始化成功")
+            except Exception as e:
+                logger.error(f"WebDriver初始化失败: {str(e)}")
+                # 尝试使用系统安装的ChromeDriver
+                try:
+                    self.driver = webdriver.Chrome(options=options)
+                    self.driver.set_page_load_timeout(DEFAULT_TIMEOUT)
+                    logger.info("使用系统ChromeDriver初始化成功")
+                except Exception as e2:
+                    logger.error(f"使用系统ChromeDriver初始化失败: {str(e2)}")
+                    raise
         except Exception as e:
             logger.error(f"WebDriver初始化失败: {str(e)}")
             raise
@@ -222,7 +231,7 @@ class OutlookCreator:
         random.shuffle(password)
         return ''.join(password)
     
-    def wait_for_element(self, by: By, value: str, timeout: int = DEFAULT_TIMEOUT):
+    def wait_for_element(self, by: str, value: str, timeout: int = DEFAULT_TIMEOUT):
         """
         等待元素出现并返回
         
@@ -234,6 +243,10 @@ class OutlookCreator:
         Returns:
             WebElement: 找到的元素
         """
+        from selenium.webdriver.support.ui import WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException
+        
         try:
             element = WebDriverWait(self.driver, timeout).until(
                 EC.presence_of_element_located((by, value))
@@ -243,7 +256,7 @@ class OutlookCreator:
             logger.error(f"等待元素超时: {by}={value}")
             raise
     
-    def wait_for_clickable(self, by: By, value: str, timeout: int = DEFAULT_TIMEOUT):
+    def wait_for_clickable(self, by: str, value: str, timeout: int = DEFAULT_TIMEOUT):
         """
         等待元素可点击并返回
         
@@ -255,6 +268,10 @@ class OutlookCreator:
         Returns:
             WebElement: 找到的元素
         """
+        from selenium.webdriver.support.ui import WebDriverWait
+        from selenium.webdriver.support import expected_conditions as EC
+        from selenium.common.exceptions import TimeoutException
+        
         try:
             element = WebDriverWait(self.driver, timeout).until(
                 EC.element_to_be_clickable((by, value))
@@ -271,6 +288,8 @@ class OutlookCreator:
         Returns:
             Dict: 包含账号信息的字典
         """
+        from selenium.webdriver.common.by import By
+        
         start_time = time.time()
         
         try:
@@ -370,6 +389,9 @@ class OutlookCreator:
         Returns:
             str: TOTP密钥
         """
+        import pyotp
+        from selenium.webdriver.common.by import By
+        
         try:
             logger.info(f"[•] {self.current_account['email']}的TOTP绑定中...")
             
@@ -414,6 +436,8 @@ class OutlookCreator:
         Returns:
             Dict: 包含账号信息的字典
         """
+        from selenium.webdriver.common.by import By
+        
         start_time = time.time()
         
         if new_password is None:
@@ -674,7 +698,7 @@ class AccountManager:
         
         return accounts
     
-    def export_accounts(self, output_file: str, format_type: str = "csv"):
+    def export_accounts(self, output_file: str, format_type: str = "text"):
         """
         导出账号信息
         
